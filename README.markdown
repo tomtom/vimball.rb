@@ -31,32 +31,36 @@ Example configuration file:
 Uploading vimballs to vim.org
 -----------------------------
 
-In addition to handling vimballs, this script can also upload vimballs 
-to http://www.vim.org\. In order to make this work, your scripts have to 
-comply to the following convention:
+vimball.rb doesn't upload files by itself but it can save a script 
+definition as yaml file, which can be fed to 
+[vimscriptuploader.rb](http://github.org/tomtom/vimscriptuploader.rb).
+
+In order to make this work, your scripts have to comply to the following 
+convention:
 
 * At least one file must contain a `GetLatestVimScripts` tagline. If the 
   file is "foo.vim", the line must look somewhat like:
 
-  `" GetLatestVimScripts: 123 0 :AutoInstall: foo.vim`
+    " GetLatestVimScripts: 123 0 :AutoInstall: foo.vim
 
 * At least one file must set a global `loaded_PLUGIN` variable. If the 
   plugin is "bar", the corresponding line must look like:
 
-  `let loaded_bar = VERSION_NUMBER`
+    let loaded_bar = VERSION_NUMBER
 
   where `VERSION_NUMBER` is an integer that complies with vim's version 
   numbering system (see :help v:version).
 
-* You must supply a username and a password. This can be done either 
-  from the command line or the configuration file.
-
 * If you use tags, vimball.rb will compile the comment version from the 
-  commit messages since the latest tag. If not, version comments are 
-  limited to simple messages if the configuration file defines a field 
-  `history_fmt` that must contain one `%s`, which will be filled in with 
-  the plugin name, the formatted string will be posted as version 
-  comment. The MD5 checksum will be added to the version comment.
+  commit messages since the latest tag. The following tag formats are 
+  supported (e.g. if the version number is 1.02): v102, 102, 1.02.
+
+  If you don't use tags, version comments are limited to simple messages 
+  if the configuration file defines a field `history_fmt` that must 
+  contain one `%s`, which will be filled in with the plugin name, the 
+  formatted string will be posted as version comment.
+
+  The MD5 checksum will be added to the version comment.
 
 
 Examples
@@ -70,9 +74,17 @@ Create vimballs if a file has changed:
 
     vimball.rb -u vba myplugin.recipe
 
-Create a vimball and upload it to vim.org (if it has changed):
+Create a vimball and upload it to vim.org with 
+[vimscriptuploader.rb](http://github.org/tomtom/vimscriptuploader.rb):
 
-    vimball.rb -u --upload --user foo --password bar vba myplugin.recipe
+    rm myplugin.yml || echo ignore error
+    vimball.rb -u --save-yaml -- vba myplugin.recipe
+    # myplugin.yml is created by vimball.rb
+    # A more sophisticated solution wouldn't remove the older yaml file 
+    # but compare timestamps.
+    if [ -e myplugin.yml ]; then
+        vimscriptuploader.rb --user foo --password bar myplugin.yml
+    fi
 
 Install a vimball:
 
@@ -82,6 +94,13 @@ Install a vimball as a "bundle" (i.e. in its own directory under
 `~/.vim/bundle`):
 
     vimball.rb --repo install myplugin.vba
+
+
+Dependencies
+------------
+
+* ruby 1.8
+* git (to extract log messages and tags for the YAML script definition)
 
 
 > 2010-11-01; @Last Change: 2010-11-01.
