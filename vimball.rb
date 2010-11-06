@@ -3,7 +3,7 @@
 # @Author:      Tom Link (micathom AT gmail com)
 # @License:     GPL (see http://www.gnu.org/licenses/gpl.txt)
 # @Created:     2009-02-10.
-# @Last Change: 2010-11-05.
+# @Last Change: 2010-11-06.
 #
 # This script creates and installs vimballs without vim.
 #
@@ -573,7 +573,9 @@ HEADER
         end
 
         script_id = get_id(name, recipe)
-        if script_def.has_key?('id') and script_def['id'] != script_id
+        if script_id.nil?
+            $logger.error "No Script ID found"
+        elsif (script_def.has_key?('id') and script_def['id'] != script_id)
             $logger.error "Script ID mismatch: Expected #{script_def['id']} but got #{script_id}"
             return nil
         end
@@ -648,7 +650,7 @@ HEADER
             File.readlines(filename).each do |line|
                 if line.chomp =~ /^" GetLatestVimScripts: (\d+) +\d+ +(:AutoInstall: +)?#{bname}$/
                     id = $1
-                    if id =~ /[1-9]/
+                    if id and !id.empty? and id.to_i != 0 and id =~ /[1-9]/
                         $logger.debug "#{name}: Script ID is ##{id}"
                         return id
                     end
