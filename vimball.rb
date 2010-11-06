@@ -148,21 +148,6 @@ HEADER
                     exit
                 end
 
-                opts.on('--print-version NAME', String, 'Print the plugins current version number') do |value|
-                    recipe = File.join(config['outdir'], "#{value}.recipe")
-                    puts Vimball.new(config).get_version(recipe, value)
-                    exit
-                end
-
-                opts.on('--print-saved-version NAME', String, 'Print the plugins last saved version number') do |value|
-                    yaml = File.join(config['outdir'], "#{value}.yml")
-                    if File.exist?(yaml)
-                        script_def = YAML.load_file(yaml)
-                        puts script_def['version']
-                    end
-                    exit
-                end
-
                 opts.on('-R', '--[no-]recipe', 'On install, save the recipe in DESTDIR/vimballs/recipes') do |bool|
                     config['save_recipes'] = bool
                 end
@@ -177,10 +162,6 @@ HEADER
 
                 opts.on('-u', '--[no-]update', 'Create VBA only if it is outdated') do |bool|
                     config['update'] = bool
-                end
-
-                opts.on('-y', '--save-yaml [YAML]', String, 'Save a YAML script definition that can be fed to vimscriptuploader.rb') do |value|
-                    config['script_def_yaml'] = value
                 end
 
                 opts.on('-z', '--gzip', 'Save as vba.gz') do |value|
@@ -377,10 +358,6 @@ HEADER
             end
         end
 
-        if @config.has_key?('script_def_yaml')
-            get_script_def(name)
-        end
-
     end
 
 
@@ -559,127 +536,6 @@ HEADER
                 return filename
             end
         end
-    end
-
-
-    def get_script_def(name)
-        recipe = File.join(@config['outdir'], "#{name}.recipe")
-        vimball = File.join(@config['outdir'], "#{name}.vba")
-        script_yml = @config['script_def_yaml'] || File.join(@config['outdir'], "#{name}.yml")
-        if File.exist?(script_yml)
-            script_def = YAML.load_file(script_yml)
-        else
-            script_def = {}
-        end
-
-        script_id = get_id(name, recipe)
-        if script_id.nil?
-            $logger.error "No Script ID found"
-        elsif (script_def.has_key?('id') and script_def['id'] != script_id)
-            $logger.error "Script ID mismatch: Expected #{script_def['id']} but got #{script_id}"
-            return nil
-        end
-        script_def['id'] = script_id
-
-        script_def['version'] = get_version(recipe, name)
-        if script_def['version'].nil?
-            return nil
-        end
-
-        script_def['message'] = ""
-        if @repo and File.exist?(File.join(@repo, '.git'))
-            FileUtils.cd(@repo) do
-                tags = `git tag`.split(/\n/)
-                unless tags.empty?
-                    tags.sort! do |a, b|
-                        if a =~ /^v?(\d+)$/
-                            a = $1
-                            af = a.to_f / 100
-                        else
-                            af = a.to_f
-                        end
-                        if b =~ /^v?(\d+)$/
-                            b = $1
-                            bf = b.to_f / 100
-                        else
-                            bf = b.to_f
-                        end
-                        if af == 0 and bf == 0
-                            a <=> b
-                        else
-                            af <=> bf
-                        end
-                    end
-                    latest_tag = tags.last
-                    $logger.debug "git log --oneline #{latest_tag}.."
-                    changes = `git log --oneline #{latest_tag}..`
-                    unless changes.empty?
-                        changes = changes.split(/\n/).map do |line|
-                            line.sub(/^\S+/, '-')
-                        end
-                        if @config['ignore_git_messages_rx']
-                            ignore_git_messages_rx = Regexp.new(@config['ignore_git_messages_rx'])
-                            changes.delete_if {|line| line =~ ignore_git_messages_rx}
-                        end
-                        script_def['message'] = changes.join("\n")
-                        script_def['message'] << "\n" unless script_def['message'].empty?
-                    end
-                end
-            end
-        end
-        # p "DBG", script_def['message']
-        if script_def['message'].empty? and @config.has_key?('history_fmt')
-            script_def['message'] = @config['history_fmt'] % name
-            script_def['message'] << "\n"
-        end
-        vba = File.open(vimball, 'rb') {|io| io.read}
-        script_def['message'] << "MD5 checksum: #{Digest::MD5.hexdigest(vba)}"
-
-        script_def['file'] = vimball
-
-        File.open(script_yml, 'w') {|io| YAML.dump(script_def, io)}
-        return script_def
-    end
-
-
-    def get_id(name, recipe)
-        File.readlines(recipe).each do |line|
-            file = line.chomp
-            filename = filename_on_disk(name, file, file)
-            bname = File.basename(filename)
-            File.readlines(filename).each do |line|
-                if line.chomp =~ /^" GetLatestVimScripts: (\d+) +\d+ +(:AutoInstall: +)?#{bname}$/
-                    id = $1
-                    if id and !id.empty? and id.to_i != 0 and id =~ /[1-9]/
-                        $logger.debug "#{name}: Script ID is ##{id}"
-                        return id
-                    end
-                end
-            end
-        end
-        return nil
-    end
-
-
-    def get_version(recipe, name)
-        $logger.debug "Get version number for #{name} (#{recipe})"
-        File.readlines(recipe).each do |line|
-            file = line.chomp
-            filename = filename_on_disk(name, file, file)
-            $logger.debug "Get version number in #{filename}"
-            File.readlines(filename).each do |line|
-                if line.chomp =~ /^let (g:)?loaded_#{name} = (\d+)$/
-                    version = $2.to_i
-                    major = version / 100
-                    minor = version - major * 100
-                    majmin = "%d.%02d" % [major, minor]
-                    $logger.debug "#{name}: Version number is #{majmin}"
-                    return majmin
-                end
-            end
-        end
-        $logger.error "Cannot find version number: #{recipe}"
-        return nil
     end
 
 end
