@@ -3,7 +3,7 @@
 # @Author:      Tom Link (micathom AT gmail com)
 # @License:     GPL (see http://www.gnu.org/licenses/gpl.txt)
 # @Created:     2009-02-10.
-# @Last Change: 2010-11-01.
+# @Last Change: 2010-11-05.
 #
 # This script creates and installs vimballs without vim.
 #
@@ -179,26 +179,14 @@ HEADER
                     config['update'] = bool
                 end
 
-                opts.on('-U', '--[no-]upload', 'Update the plugin yaml file and use vimscriptuploader to upload the vba to www.vim.org') do |bool|
-                    config['upload'] = bool
+                opts.on('-y', '--save-yaml [YAML]', String, 'Save a YAML script definition that can be fed to vimscriptuploader.rb') do |value|
+                    config['script_def_yaml'] = value
                 end
 
                 opts.on('-z', '--gzip', 'Save as vba.gz') do |value|
                     config['compress'] = value
                 end
 
-
-                opts.separator ' '
-                opts.separator 'Uploading scripts to www.vim.org:'
-
-                opts.on('--password TEXT', String, 'User password') do |value|
-                    config['password'] = value
-                end
-
-                opts.on('--user TEXT', String, 'User name') do |value|
-                    config['username'] = value
-                end
-                
 
                 opts.separator ' '
                 opts.separator 'Other Options:'
@@ -263,13 +251,6 @@ HEADER
 
     def initialize(config)
         @config = config
-        if @config['upload']
-            require 'mechanize'
-            @agent = WWW::Mechanize.new do |agent|
-                agent.user_agent = "Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US; rv:1.9.2.4) Gecko/20100513 Firefox/3.6.4"
-            end
-            @logged_in = false
-        end
     end
 
 
@@ -396,11 +377,8 @@ HEADER
             end
         end
 
-        if @config['upload']
-            script_def = get_script_def(name)
-            if script_def
-                process_upload(script_def)
-            end
+        if @config.has_key?('script_def_yaml')
+            get_script_def(name)
         end
 
     end
@@ -587,7 +565,7 @@ HEADER
     def get_script_def(name)
         recipe = File.join(@config['outdir'], "#{name}.recipe")
         vimball = File.join(@config['outdir'], "#{name}.vba")
-        script_yml = File.join(@config['outdir'], "#{name}.yml")
+        script_yml = @config['script_def_yaml'] || File.join(@config['outdir'], "#{name}.yml")
         if File.exist?(script_yml)
             script_def = YAML.load_file(script_yml)
         else
@@ -612,13 +590,13 @@ HEADER
                 tags = `git tag`.split(/\n/)
                 unless tags.empty?
                     tags.sort! do |a, b|
-                        if a =~ /^v(\d+)$/
+                        if a =~ /^v?(\d+)$/
                             a = $1
                             af = a.to_f / 100
                         else
                             af = a.to_f
                         end
-                        if b =~ /^v(\d+)$/
+                        if b =~ /^v?(\d+)$/
                             b = $1
                             bf = b.to_f / 100
                         else
@@ -642,10 +620,12 @@ HEADER
                             changes.delete_if {|line| line =~ ignore_git_messages_rx}
                         end
                         script_def['message'] = changes.join("\n")
+                        script_def['message'] << "\n" unless script_def['message'].empty?
                     end
                 end
             end
         end
+        # p "DBG", script_def['message']
         if script_def['message'].empty? and @config.has_key?('history_fmt')
             script_def['message'] = @config['history_fmt'] % name
             script_def['message'] << "\n"
@@ -698,72 +678,6 @@ HEADER
         end
         $logger.error "Cannot find version number: #{recipe}"
         return nil
-    end
-
-
-    def process_upload(script_def)
-        return if script_def.nil?
-        login
-        begin
-            upload(script_def)
-        ensure
-            logout
-        end
-    end
-
-
-    def login
-        return if @logged_in
-        user = @config['username']
-        password = @config['password']
-        if !user or !password
-            $logger.fatal "Username or password is missing!"
-            exit 5
-        elsif @config['dry']
-            $logger.warn "Login: #{user}:*********"
-        else
-            @agent.get('http://www.vim.org/login.php') do |page|
-                my_page = page.form_with(:name => 'login') do |form|
-                    $logger.debug "Form: #{form.inspect}"
-                    form.userName = user
-                    form.password = password
-                end.submit
-                $logger.debug "Login result: #{my_page.body}"
-                @logged_in = true
-            end
-        end
-    end
-
-
-    def logout
-        if @config['dry']
-            $logger.warn "Log out"
-        else
-            page = @agent.get('http://www.vim.org/logout.php')
-            $logger.debug "Logout result: #{page.body}"
-        end
-    end
-
-
-    def upload(script_def)
-        url = 'http://www.vim.org/scripts/add_script_version.php?script_id=%d' % script_def['id']
-        $logger.warn "Upload URL: #{url}"
-        if @config['dry']
-            puts script_def.inspect
-        else
-            @agent.get(url) do |page|
-                form = page.form_with(:name => 'script', :method => 'POST')
-                form.script_version = script_def['version']
-                form.version_comment = script_def['message']
-                # form.vim_version = script_def['vim_version']
-                # form.field_with(:name => 'vim_version').options[2].select
-                form.file_uploads.first.file_name = script_def['file']
-                result = form.submit(form.buttons.first)
-                $logger.debug "Upload result: #{result.body}"
-                return true
-            end
-        end
-        return false
     end
 
 end
