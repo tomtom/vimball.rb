@@ -10,6 +10,7 @@ Configuration
 -------------
 
 Configuration is done via yaml files:
+
 * `VIMFILES/vimballs/config_${hostname}.yml`
 * or `VIMFILES/vimballs/config.yml`
 
@@ -26,6 +27,39 @@ Example configuration file:
     ignore_git_messages_rx: ^- (readme|docs|misc|meta|etc|minor)$
     roots:
       - /home/foo/.vim/bundle
+
+
+Examples
+--------
+
+Create a vimball:
+
+    vimball.rb vba myplugin.recipe
+
+Create vimballs if a file has changed:
+
+    vimball.rb -u vba myplugin.recipe
+
+Create a vimball and upload it to vim.org with 
+[vimscriptuploader.rb](http://github.org/tomtom/vimscriptuploader.rb):
+
+    rm myplugin.yml || echo ignore error
+    vimball.rb -u --save-yaml -- vba myplugin.recipe
+    # myplugin.yml is created by vimball.rb
+    # A more sophisticated solution wouldn't remove the older yaml file 
+    # but compare timestamps.
+    if [ -e myplugin.yml ]; then
+        vimscriptuploader.rb --user foo --password bar myplugin.yml
+    fi
+
+Install a vimball:
+
+    vimball.rb install myplugin.vba
+
+Install a vimball as a "bundle" (i.e. in its own directory under 
+`~/.vim/bundle`):
+
+    vimball.rb --repo install myplugin.vba
 
 
 Uploading vimballs to vim.org
@@ -61,39 +95,6 @@ convention:
   formatted string will be posted as version comment.
 
   The MD5 checksum will be added to the version comment.
-
-
-Examples
---------
-
-Create a vimball:
-
-    vimball.rb vba myplugin.recipe
-
-Create vimballs if a file has changed:
-
-    vimball.rb -u vba myplugin.recipe
-
-Create a vimball and upload it to vim.org with 
-[vimscriptuploader.rb](http://github.org/tomtom/vimscriptuploader.rb):
-
-    rm myplugin.yml || echo ignore error
-    vimball.rb -u --save-yaml -- vba myplugin.recipe
-    # myplugin.yml is created by vimball.rb
-    # A more sophisticated solution wouldn't remove the older yaml file 
-    # but compare timestamps.
-    if [ -e myplugin.yml ]; then
-        vimscriptuploader.rb --user foo --password bar myplugin.yml
-    fi
-
-Install a vimball:
-
-    vimball.rb install myplugin.vba
-
-Install a vimball as a "bundle" (i.e. in its own directory under 
-`~/.vim/bundle`):
-
-    vimball.rb --repo install myplugin.vba
 
 
 Dependencies
