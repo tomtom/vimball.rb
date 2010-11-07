@@ -63,7 +63,6 @@ Dependencies
 ------------
 
 * ruby 1.8
-* git (to extract log messages and tags for the YAML script definition)
 
 
 <!-- 2010-11-01; @Last Change: 2010-11-01. -->
