@@ -284,10 +284,25 @@ HEADER
 
         vimball = [HEADER]
 
-        files = File.readlines(recipe)
         name = File.basename(recipe, '.recipe')
         vbafile = File.join(@config['outdir'], name + '.vba')
         vbafile << '.gz' if @config['compress']
+
+        files = File.readlines(recipe)
+        files.map! do |pattern0|
+            pattern = pattern0.chomp
+            fullpattern = File.join(@config['vimfiles'], pattern)
+            fullpattern1 = filename_on_disk(name, pattern, fullpattern)
+            files1 = Dir[fullpattern1]
+            unless @repo.nil?
+                file_start = @repo.size + 1
+                files1.map! do |file|
+                    file[file_start..-1]
+                end
+            end
+            files1
+        end
+        files.flatten!
         
 
         if @config['update'] and File.exist?(vbafile)
